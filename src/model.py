@@ -26,17 +26,17 @@ import torch.nn.functional as F
 class Encoder(nn.Module):
   """encoder in DA_RNN."""
 
-  def __init__(self, T, input_size, encoder_num_hidden, parallel=False):
+  def __init__(self, T, feat_dim, encoder_num_hidden, parallel=False):
     """Initialize an encoder in DA_RNN."""
     super(Encoder, self).__init__()
     self.encoder_num_hidden = encoder_num_hidden
-    self.input_size = input_size # features dim
+    self.feat_dim = feat_dim # features dim
     self.parallel = parallel
     self.T = T # timesteps
 
     # Fig 1. Temporal Attention Mechanism: Encoder is LSTM
     self.encoder_lstm = nn.LSTM(
-        input_size=self.input_size, hidden_size=self.encoder_num_hidden)
+        input_size=self.feat_dim, hidden_size=self.encoder_num_hidden)
 
     # Construct Input Attention Mechanism via deterministic attention model
     # Eq. 8: W_e[h_{t-1}; s_{t-1}] + U_e * x^k
@@ -54,13 +54,13 @@ class Encoder(nn.Module):
         """
     import ipdb; ipdb.set_trace()
     X_tilde = Variable(
-        X.data.new(X.size(0), self.T - 1, self.input_size).zero_())
+        X.data.new(X.size(0), self.T - 1, self.feat_dim).zero_())
     X_encoded = Variable(
         X.data.new(X.size(0), self.T - 1, self.encoder_num_hidden).zero_())
 
     # Eq. 8, parameters not in nn.Linear but to be learnt
     # v_e = torch.nn.Parameter(data=torch.empty(
-    #     self.input_size, self.T).uniform_(0, 1), requires_grad=True)
+    #     self.feat_dim, self.T).uniform_(0, 1), requires_grad=True)
     # U_e = torch.nn.Parameter(data=torch.empty(
     #     self.T, self.T).uniform_(0, 1), requires_grad=True)
 
@@ -69,19 +69,19 @@ class Encoder(nn.Module):
     s_n = self._init_states(X)
 
     for t in range(self.T - 1):
-      # batch_size * input_size * (2*hidden_size + T - 1)
       x = torch.cat(
-          (h_n.repeat(self.input_size, 1, 1).permute(1, 0, 2),
-           s_n.repeat(self.input_size, 1, 1).permute(1, 0, 2), X.permute(
+          (h_n.repeat(self.feat_dim, 1, 1).permute(1, 0, 2),
+           s_n.repeat(self.feat_dim, 1, 1).permute(1, 0, 2), X.permute(
                0, 2, 1)),
           dim=2)
 
+      # first dim: batch_size * feat_dim * (2*hidden_size + T - 1)
       import ipdb; ipdb.set_trace()
       x = self.encoder_attn(
           x.view(-1, self.encoder_num_hidden * 2 + self.T - 1))
 
       # get weights by softmax
-      alpha = F.softmax(x.view(-1, self.input_size))
+      alpha = F.softmax(x.view(-1, self.feat_dim))
 
       # get new input for LSTM
       x_tilde = torch.mul(alpha, X[:, t, :])
@@ -108,6 +108,7 @@ class Encoder(nn.Module):
         """
     # hidden state and cell state [num_layers*num_directions, batch_size, hidden_size]
     # https://pytorch.org/docs/master/nn.html?#lstm
+    # (1, batchsize, hidden_dim)
     initial_states = Variable(
         X.data.new(1, X.size(0), self.encoder_num_hidden).zero_())
     return initial_states
@@ -214,7 +215,7 @@ class DA_rnn(nn.Module):
     self.y = y
 
     self.Encoder = Encoder(
-        input_size=X.shape[1], encoder_num_hidden=encoder_num_hidden, T=T)
+        feat_dim=X.shape[1], encoder_num_hidden=encoder_num_hidden, T=T)
     self.Decoder = Decoder(
         encoder_num_hidden=encoder_num_hidden,
         decoder_num_hidden=decoder_num_hidden,
@@ -236,7 +237,7 @@ class DA_rnn(nn.Module):
 
     # Training set
     self.train_timesteps = int(self.X.shape[0] * 0.7)
-    self.input_size = self.X.shape[1]
+    self.feat_dim = self.X.shape[1]
 
   def train(self):
     """training process."""
@@ -257,8 +258,8 @@ class DA_rnn(nn.Module):
       while (idx < self.train_timesteps):
         # get the indices of X_train
         indices = ref_idx[idx:(idx + self.batch_size)]
-        # x = np.zeros((self.T - 1, len(indices), self.input_size))
-        x = np.zeros((len(indices), self.T - 1, self.input_size))
+        # x = np.zeros((self.T - 1, len(indices), self.feat_dim))
+        x = np.zeros((len(indices), self.T - 1, self.feat_dim))
         y_prev = np.zeros((len(indices), self.T - 1))
         y_gt = self.y[indices + self.T]
 
