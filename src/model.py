@@ -17,9 +17,10 @@ from torch import nn
 from torch import optim
 import torch.nn.functional as F
 
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+# import matplotlib
+# matplotlib.use('Agg')
+
+# import matplotlib.pyplot as plt
 
 
 class Encoder(nn.Module):
@@ -51,6 +52,7 @@ class Encoder(nn.Module):
             X
 
         """
+    import ipdb; ipdb.set_trace()
     X_tilde = Variable(
         X.data.new(X.size(0), self.T - 1, self.input_size).zero_())
     X_encoded = Variable(
@@ -280,42 +282,44 @@ class DA_rnn(nn.Module):
             epoch * iter_per_epoch, (epoch + 1) * iter_per_epoch)])
 
       if epoch % 10 == 0:
-        print "Epochs: ", epoch, " Iterations: ", n_iter, " Loss: ", self.epoch_losses[
-            epoch]
+        print("Epochs: ", epoch, " Iterations: ", n_iter, " Loss: ",
+              self.epoch_losses[epoch])
 
-      if epoch == self.epochs - 1:
-        y_train_pred = self.test(on_train=True)
-        y_test_pred = self.test(on_train=False)
-        y_pred = np.concatenate((y_train_pred, y_test_pred))
-        plt.ioff()
-        plt.figure()
-        plt.plot(range(1, 1 + len(self.y)), self.y, label="True")
-        plt.plot(
-            range(self.T,
-                  len(y_train_pred) + self.T),
-            y_train_pred,
-            label='Predicted - Train')
-        plt.plot(
-            range(self.T + len(y_train_pred),
-                  len(self.y) + 1),
-            y_test_pred,
-            label='Predicted - Test')
-        plt.legend(loc='upper left')
-        plt.show()
+    y_train_pred = self.test(on_train=True)
+    y_test_pred = self.test(on_train=False)
+    y_pred = np.concatenate((y_train_pred, y_test_pred))
+    # plt.ioff()
+    # plt.figure()
+    # plt.plot(range(1, 1 + len(self.y)), self.y, label="True")
+    # plt.plot(
+    #     range(self.T,
+    #           len(y_train_pred) + self.T),
+    #     y_train_pred,
+    #     label='Predicted - Train')
+    # plt.plot(
+    #     range(self.T + len(y_train_pred),
+    #           len(self.y) + 1),
+    #     y_test_pred,
+    #     label='Predicted - Test')
+    # plt.legend(loc='upper left')
+    # plt.show()
 
-      # Save files in last iterations
-      # if epoch == self.epochs - 1:
-      #     np.savetxt('../loss.txt', np.array(self.epoch_losses), delimiter=',')
-      #     np.savetxt('../y_pred.txt',
-      #                np.array(self.y_pred), delimiter=',')
-      #     np.savetxt('../y_true.txt',
-      #                np.array(self.y_true), delimiter=',')
+    # Save files in last iterations
+    np.savetxt('../loss.txt', np.array(self.epoch_losses), delimiter=',')
+    np.savetxt('../y_pred.txt', np.array(self.y_pred), delimiter=',')
+    np.savetxt('../y_true.txt', np.array(self.y_true), delimiter=',')
 
   def train_forward(self, X, y_prev, y_gt):
+    '''
+    X: (batchsize, timesteps, fea_dim)
+    y_prev: (batchsize, timesteps)
+    y_gt: (batchsize) y_gt is y_prev_(t+1)
+    '''
     # zero gradients
     self.encoder_optimizer.zero_grad()
     self.decoder_optimizer.zero_grad()
 
+    import ipdb; ipdb.set_trace()
     input_weighted, input_encoded = self.Encoder(
         Variable(torch.from_numpy(X).type(torch.FloatTensor)))
     y_pred = self.Decoder(
