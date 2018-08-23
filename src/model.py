@@ -30,9 +30,9 @@ class Encoder(nn.Module):
     """Initialize an encoder in DA_RNN."""
     super(Encoder, self).__init__()
     self.encoder_num_hidden = encoder_num_hidden
-    self.input_size = input_size
+    self.input_size = input_size # features dim
     self.parallel = parallel
-    self.T = T
+    self.T = T # timesteps
 
     # Fig 1. Temporal Attention Mechanism: Encoder is LSTM
     self.encoder_lstm = nn.LSTM(
@@ -76,6 +76,7 @@ class Encoder(nn.Module):
                0, 2, 1)),
           dim=2)
 
+      import ipdb; ipdb.set_trace()
       x = self.encoder_attn(
           x.view(-1, self.encoder_num_hidden * 2 + self.T - 1))
 
@@ -267,7 +268,7 @@ class DA_rnn(nn.Module):
           y_prev[bs, :] = self.y[indices[bs]:(indices[bs] + self.T - 1)]
 
         loss = self.train_forward(x, y_prev, y_gt)
-        self.iter_losses[epoch * iter_per_epoch + idx / self.batch_size] = loss
+        self.iter_losses[epoch * iter_per_epoch + idx // self.batch_size] = loss
 
         idx += self.batch_size
         n_iter += 1
