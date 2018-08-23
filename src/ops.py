@@ -4,7 +4,6 @@
 
 """
 
-
 # from tqdm import tqdm
 # import matplotlib.pyplot as plt
 
@@ -16,7 +15,7 @@ import pandas as pd
 
 
 def read_data(input_path, debug=True):
-    """Read nasdaq stocks data.
+  """Read nasdaq stocks data.
 
     Args:
         input_path (str): directory to nasdaq dataset.
@@ -26,15 +25,15 @@ def read_data(input_path, debug=True):
         y (np.ndarray): ground truth.
 
     """
-    df = pd.read_csv(input_path, nrows = 250 if debug else None)
-    X = df.iloc[:, 0:-1].values
-    y = df.iloc[:, -1].values
+  df = pd.read_csv(input_path, nrows=250 if debug else None)
+  X = df.iloc[:, 0:-1].values
+  y = df.iloc[:, -1].values
 
-    return X, y
+  return X, y
 
 
 def train_val_test_split(X, y, is_Val):
-    """training, val, test set split.
+  """training, val, test set split.
 
     Args:
         X (np.ndarray): features.
@@ -60,20 +59,20 @@ def train_val_test_split(X, y, is_Val):
     Adjusted by making size divided by batch size (128).
 
     """
-    # Train set
-    X_train = X[0:35072, :]
-    y_train = y[0:35072]
+  # Train set
+  X_train = X[0:35072, :]
+  y_train = y[0:35072]
 
-    # Test set
-    X_test = X[37830:40448, :]
-    y_test = y[37830:40448]
+  # Test set
+  X_test = X[37830:40448, :]
+  y_test = y[37830:40448]
 
-    # Val set
-    if is_Val:
-        X_val = X[35072:37760, :]
-        y_val = y[35072:37760]
-    else:
-        X_val = np.zeros_like(X_test)
-        y_val = np.zeros_like(y_test)
+  # Val set
+  if is_Val:
+    X_val = X[35072:37760, :]
+    y_val = y[35072:37760]
+  else:
+    X_val = np.zeros_like(X_test)
+    y_val = np.zeros_like(y_test)
 
-    return X_train, y_train, X_test, y_test, X_val, y_val
+  return X_train, y_train, X_test, y_test, X_val, y_val
