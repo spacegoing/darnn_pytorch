@@ -30,9 +30,9 @@ class Encoder(nn.Module):
     """Initialize an encoder in DA_RNN."""
     super(Encoder, self).__init__()
     self.encoder_num_hidden = encoder_num_hidden
-    self.feat_dim = feat_dim # features dim
+    self.feat_dim = feat_dim  # features dim
     self.parallel = parallel
-    self.T = T # timesteps
+    self.T = T  # timesteps
 
     # Fig 1. Temporal Attention Mechanism: Encoder is LSTM
     self.encoder_lstm = nn.LSTM(
@@ -40,21 +40,19 @@ class Encoder(nn.Module):
 
     # Construct Input Attention Mechanism via deterministic attention model
     # Eq. 8: W_e[h_{t-1}; s_{t-1}] + U_e * x^k
-    self.encoder_attn = nn.Linear(
-        in_features=2 * self.encoder_num_hidden + self.T - 1,
-        out_features=1,
-        bias=True)
+    self.encoder_attn = nn.Sequential(
+        nn.Linear(2 * self.encoder_num_hidden + self.T - 1, self.T - 1),
+        nn.Tanh(), nn.Linear(self.T - 1, 1))
 
   def forward(self, X):
     """forward.
 
         Args:
-            X
+            X: (batchsize, T-1, feat_dim)
 
         """
-    import ipdb; ipdb.set_trace()
-    X_tilde = Variable(
-        X.data.new(X.size(0), self.T - 1, self.feat_dim).zero_())
+    # import ipdb; ipdb.set_trace()
+    X_tilde = Variable(X.data.new(X.size(0), self.T - 1, self.feat_dim).zero_())
     X_encoded = Variable(
         X.data.new(X.size(0), self.T - 1, self.encoder_num_hidden).zero_())
 
@@ -65,25 +63,36 @@ class Encoder(nn.Module):
     #     self.T, self.T).uniform_(0, 1), requires_grad=True)
 
     # hidden, cell: initial states with dimention hidden_size
+    # todo: (1, batchsize, hidden_dim) -> (batchsize, feat_dim, hid_dim)
     h_n = self._init_states(X)
     s_n = self._init_states(X)
 
     for t in range(self.T - 1):
+      # (batchsize, feat_dim, hid_dim*2+T-1)
       x = torch.cat(
-          (h_n.repeat(self.feat_dim, 1, 1).permute(1, 0, 2),
-           s_n.repeat(self.feat_dim, 1, 1).permute(1, 0, 2), X.permute(
-               0, 2, 1)),
+          (
+              h_n.repeat(self.feat_dim, 1, 1).permute(
+                  1, 0, 2),  # (batchsize, feat_dim, hid_dim)
+              s_n.repeat(self.feat_dim, 1, 1).permute(1, 0, 2),
+              X.permute(0, 2, 1)),
           dim=2)
 
-      # first dim: batch_size * feat_dim * (2*hidden_size + T - 1)
-      import ipdb; ipdb.set_trace()
+      # dim 0: batch_size * feat_dim
+      # dim 1: hidden_size*2 + T-1
+      # -> (batch_size * feat_dim, 1)
+      # import ipdb; ipdb.set_trace()
       x = self.encoder_attn(
           x.view(-1, self.encoder_num_hidden * 2 + self.T - 1))
 
       # get weights by softmax
-      alpha = F.softmax(x.view(-1, self.feat_dim))
+      # (batch_size * feat_dim, 1) -> (batchsize, feat_dim)
+      # (batchsize, feat_dim) -> (batchsize, feat_dim)
+      alpha = F.softmax(x.view(-1, self.feat_dim), dim=1)
 
       # get new input for LSTM
+      # alpha (batchsize, feat_dim)
+      # X[:, t, :].shape = [128, 81] (batchsize, feat_dim)
+      # torch.mul is elementwise op
       x_tilde = torch.mul(alpha, X[:, t, :])
 
       # encoder LSTM
@@ -135,32 +144,42 @@ class Decoder(nn.Module):
     self.fc.weight.data.normal_()
 
   def forward(self, X_encoed, y_prev):
-    """forward."""
+    """forward.
+
+    Parameters:
+      X_encoed: (batchsize, T-1, hidden_dim)
+      y_prev: (batchsize, T-1)
+    """
+    # todo: (1, batchsize, hidden_dim) -> (batchsize, T-1, hid_dim)
     d_n = self._init_states(X_encoed)
     c_n = self._init_states(X_encoed)
 
     for t in range(self.T - 1):
 
+      # import ipdb; ipdb.set_trace()
+      # (batchsize, T-1, hid_size*3)
       x = torch.cat(
           (d_n.repeat(self.T - 1, 1, 1).permute(1, 0, 2),
            c_n.repeat(self.T - 1, 1, 1).permute(1, 0, 2), X_encoed),
           dim=2)
 
-      beta = F.softmax(
-          self.attn_layer(
-              x.view(
-                  -1,
-                  2 * self.decoder_num_hidden + self.encoder_num_hidden)).view(
-                      -1, self.T - 1))
+      # (batchsize, T-1, hid_size*3) -> (batchsize*T-1, 1)
+      attn_weights = self.attn_layer(
+          x.view(-1, 2 * self.decoder_num_hidden + self.encoder_num_hidden))
+
+      # (batchsize, T-1)
+      beta = F.softmax(attn_weights.view(-1, self.T - 1), dim=1)
       # Eqn. 14: compute context vector
-      # batch_size * encoder_hidden_size
+      # bmm( (batchsize,1,T-1) * (batchsize,T-1,hid_dim) )
+      # -> (batch_size, hid_dim)
       context = torch.bmm(beta.unsqueeze(1), X_encoed)[:, 0, :]
       if t < self.T - 1:
         # Eqn. 15
-        # batch_size * 1
+        # (batchsize, hid_dim+1) -> batch_size , 1
         y_tilde = self.fc(
             torch.cat((context, y_prev[:, t].unsqueeze(1)), dim=1))
         # Eqn. 16: LSTM
+        # y_tilde.unsqueeze(0): (1,batchsize,1)
         self.lstm_layer.flatten_parameters()
         _, final_states = self.lstm_layer(y_tilde.unsqueeze(0), (d_n, c_n))
         # 1 * batch_size * decoder_num_hidden
@@ -307,8 +326,10 @@ class DA_rnn(nn.Module):
     # plt.show()
 
     # Save files in last iterations
-    np.savetxt('../loss.txt', np.array(self.epoch_losses), delimiter=',')
-    np.savetxt('../y_pred.txt', np.array(self.y_pred), delimiter=',')
+    np.savetxt('../epoch_loss.txt', np.array(self.epoch_losses), delimiter=',')
+    np.savetxt('../iter_loss.txt', np.array(self.iter_losses), delimiter=',')
+    np.savetxt('../y.txt', np.array(self.y), delimiter=',')
+    np.savetxt('../y_pred.txt', np.array(y_pred), delimiter=',')
     np.savetxt('../y_true.txt', np.array(self.y_true), delimiter=',')
 
   def train_forward(self, X, y_prev, y_gt):
@@ -321,7 +342,7 @@ class DA_rnn(nn.Module):
     self.encoder_optimizer.zero_grad()
     self.decoder_optimizer.zero_grad()
 
-    import ipdb; ipdb.set_trace()
+    # import ipdb; ipdb.set_trace()
     input_weighted, input_encoded = self.Encoder(
         Variable(torch.from_numpy(X).type(torch.FloatTensor)))
     y_pred = self.Decoder(
