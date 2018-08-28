@@ -349,6 +349,7 @@ class DA_rnn(nn.Module):
         input_encoded, Variable(
             torch.from_numpy(y_prev).type(torch.FloatTensor)))
 
+    import ipdb; ipdb.set_trace()
     y_true = Variable(torch.from_numpy(y_gt).type(torch.FloatTensor))
 
     y_true = y_true.view(-1, 1)

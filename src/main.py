@@ -54,7 +54,7 @@ parser.add_argument(
 parser.add_argument(
     '--epochs',
     type=int,
-    default=10,
+    default=80,
     help='number of epochs to train [10, 200, 500]')
 parser.add_argument(
     '--resume', type=bool, default=False, help='resume training or not')
@@ -69,6 +69,7 @@ parser.add_argument('--cuda', action='store_true', help='enables cuda')
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 opt = parser.parse_args('--manualSeed=1 '.split())
 
+torch.manual_seed(1)
 # Read dataset
 X, y = read_data(opt.dataroot, debug=False)
 
