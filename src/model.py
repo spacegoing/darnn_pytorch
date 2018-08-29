@@ -22,6 +22,9 @@ import torch.nn.functional as F
 
 # import matplotlib.pyplot as plt
 
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device('cpu')
+
 
 class Encoder(nn.Module):
   """encoder in DA_RNN."""
@@ -77,17 +80,33 @@ class Encoder(nn.Module):
               X.permute(0, 2, 1)),
           dim=2)
 
+      # # import ipdb; ipdb.set_trace(context=7)
+      # with torch.no_grad():
+      #   tx = x.detach().clone()
+      #   tx = self.encoder_attn(tx)
+      #   tx = tx.squeeze(2)
+      #   talpha = F.softmax(tx, dim=1)
+
+      # old:
       # dim 0: batch_size * feat_dim
       # dim 1: hidden_size*2 + T-1
       # -> (batch_size * feat_dim, 1)
-      # import ipdb; ipdb.set_trace()
       x = self.encoder_attn(
           x.view(-1, self.encoder_num_hidden * 2 + self.T - 1))
-
       # get weights by softmax
       # (batch_size * feat_dim, 1) -> (batchsize, feat_dim)
       # (batchsize, feat_dim) -> (batchsize, feat_dim)
       alpha = F.softmax(x.view(-1, self.feat_dim), dim=1)
+
+      # assert (talpha == alpha).sum() == alpha.shape[0] * alpha.shape[1]
+
+      # ## improved: nn.linear take x.view(-1, self.encoder_num_hidden * 2 +
+      # # self.T - 1))
+      # # (batchsize, feat_dim, hid_dim*2+T-1) -> (batchsize, feat_dim, 1)
+      # x = self.encoder_attn(x)
+      # # (batchsize, feat_dim, 1) -> (batchsize, feat_dim)
+      # x = x.squeeze(2)
+      # alpha = F.softmax(x, dim=1)
 
       # get new input for LSTM
       # alpha (batchsize, feat_dim)
@@ -104,6 +123,8 @@ class Encoder(nn.Module):
       X_tilde[:, t, :] = x_tilde
       X_encoded[:, t, :] = h_n
 
+    import ipdb
+    ipdb.set_trace(context=7)
     return X_tilde, X_encoded
 
   def _init_states(self, X):
@@ -248,8 +269,7 @@ class DA_rnn(nn.Module):
       self.decoder = nn.DataParallel(self.decoder)
 
     self.encoder_optimizer = optim.Adam(
-        params=filter(lambda p: p.requires_grad, self.Encoder.parameters()),
-        lr=self.learning_rate)
+        self.Encoder.parameters(), lr=self.learning_rate)
     self.decoder_optimizer = optim.Adam(
         params=filter(lambda p: p.requires_grad, self.Decoder.parameters()),
         lr=self.learning_rate)
@@ -326,11 +346,11 @@ class DA_rnn(nn.Module):
     # plt.show()
 
     # Save files in last iterations
-    np.savetxt('../epoch_loss.txt', np.array(self.epoch_losses), delimiter=',')
-    np.savetxt('../iter_loss.txt', np.array(self.iter_losses), delimiter=',')
-    np.savetxt('../y.txt', np.array(self.y), delimiter=',')
-    np.savetxt('../y_pred.txt', np.array(y_pred), delimiter=',')
-    np.savetxt('../y_true.txt', np.array(self.y_true), delimiter=',')
+    # np.savetxt('../epoch_loss.txt', np.array(self.epoch_losses), delimiter=',')
+    # np.savetxt('../iter_loss.txt', np.array(self.iter_losses), delimiter=',')
+    # np.savetxt('../y.txt', np.array(self.y), delimiter=',')
+    # np.savetxt('../y_pred.txt', np.array(y_pred), delimiter=',')
+    # np.savetxt('../y_true.txt', np.array(self.y_true), delimiter=',')
 
   def train_forward(self, X, y_prev, y_gt):
     '''
@@ -349,7 +369,7 @@ class DA_rnn(nn.Module):
         input_encoded, Variable(
             torch.from_numpy(y_prev).type(torch.FloatTensor)))
 
-    import ipdb; ipdb.set_trace()
+    # import ipdb; ipdb.set_trace(context=7)
     y_true = Variable(torch.from_numpy(y_gt).type(torch.FloatTensor))
 
     y_true = y_true.view(-1, 1)

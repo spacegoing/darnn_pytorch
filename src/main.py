@@ -100,3 +100,31 @@ y_pred = model.test()
 # plt.savefig("3.png")
 # plt.close(fig3)
 # print('Finished Training')
+
+np.save('ypred3_2', y_pred.detach().numpy())
+a=np.load('ypred3.npy')
+aa=np.load('ypred3_2.npy')
+print((a==aa).sum())
+
+np.save('weight1',self.encoder_attn[0].weight.detach().numpy())
+np.save('weight1_1',self.encoder_attn[0].weight.detach().numpy())
+a=np.load('weight1.npy')
+aa=np.load('weight1_1.npy')
+assert (a==aa).sum()==a.shape[0]*a.shape[1]
+
+np.save('weight0',self.encoder_attn[0].weight.detach().numpy())
+np.save('weight0_1',self.encoder_attn[0].weight.detach().numpy())
+a=np.load('weight0.npy')
+aa=np.load('weight0_1.npy')
+assert (a==aa).sum()==a.shape[0]*a.shape[1]
+
+# # test
+# x=torch.arange(0,32)
+# x=x.view(-1,4,4)
+# w=torch.ones(1,4)
+# r=F.linear(x,w)
+# print(r.squeeze(2))
+
+# x=x.view(-1,4)
+# rr=F.linear(x,w)
+# print(rr.view(-1,4))
